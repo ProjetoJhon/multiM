@@ -1,5 +1,4 @@
-﻿import { aiResponseJsonSchema } from '../schemas/responseSchema';
-import type { AIResponse, OmniInputPayload, QuickMode } from '../types';
+﻿import type { AIResponse, OmniInputPayload, QuickMode } from '../types';
 
 const MODEL = import.meta.env.VITE_AI_MODEL || 'gemini-flash-lite-latest';
 const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
@@ -63,7 +62,6 @@ export async function orchestrate(payload: OmniInputPayload): Promise<AIResponse
     generationConfig: {
       temperature: 0.2,
       responseMimeType: 'application/json',
-      responseSchema: aiResponseJsonSchema,
     },
   };
 
