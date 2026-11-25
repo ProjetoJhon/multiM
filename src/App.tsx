@@ -124,9 +124,9 @@ export default function App() {
         {loading && <LoadingResults />}
 
         {!loading && active && (
-          <div className="space-y-4">
-            <p className="text-sm text-slate-500">
-              Aproximadamente {1 + (active.response.sources?.length || 0) + (active.response.structured_steps?.length || 0)} soluções encontradas para <span className="font-medium text-slate-700">"{active.inputSummary}"</span>
+          <div className="space-y-2">
+            <p className="text-sm text-slate-500 px-1">
+              Cerca de {active.response.sources?.length || 0} resultados para <span className="text-slate-700">"{active.inputSummary}"</span>
             </p>
             <ActionableCard response={active.response} />
           </div>
