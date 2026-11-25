@@ -125,10 +125,10 @@ function mockResponse(payload: OmniInputPayload): AIResponse {
   const hasImage = payload.attachments.some((a) => a.kind === 'image');
   const hasAudio = payload.attachments.some((a) => a.kind === 'audio');
   const intent = hasImage ? 'Diagnóstico visual' : hasAudio ? 'Organização de áudio' : 'Resumo e plano de ação';
+  const keyState = API_KEY ? 'definida' : 'vazia';
   return {
     detected_intent: intent,
-    direct_answer:
-      'Recebi sua entrada e montei uma resposta estruturada. Configure VITE_GEMINI_API_KEY para ativar análise multimodal real.',
+    direct_answer: `Mock ativo (API_KEY ${keyState}, modelo ${MODEL}). Se a chave está no .env, reinicie o servidor Vite e dê hard refresh (Ctrl+F5).`,
     structured_steps: [
       { id: 'step-1', label: 'Revise a intenção detectada e ajuste o modo, se necessário.', done: false },
       { id: 'step-2', label: 'Confirme os dados extraídos antes de executar ações.', done: false },
