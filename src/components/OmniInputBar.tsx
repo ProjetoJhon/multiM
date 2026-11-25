@@ -1,5 +1,5 @@
 ﻿import { useRef, useState } from 'react';
-import { Camera, FileUp, Loader2, Mic, Search as SearchIcon, Send, Square, X } from 'lucide-react';
+import { Camera, FileUp, Mic, Search as SearchIcon, Square, X } from 'lucide-react';
 import type { MediaAttachment, OmniInputPayload, QuickMode } from '../types';
 import { fileToAttachment, startAudioRecording } from '../services/mediaProcessor';
 
@@ -15,6 +15,7 @@ export function OmniInputBar({ mode, loading, compact, onSubmit }: Props) {
   const [attachments, setAttachments] = useState<MediaAttachment[]>([]);
   const [recording, setRecording] = useState<null | { stop: () => Promise<MediaAttachment>; cancel: () => void }>(null);
   const [error, setError] = useState<string | null>(null);
+  const [focused, setFocused] = useState(false);
   const imageRef = useRef<HTMLInputElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -62,11 +63,11 @@ export function OmniInputBar({ mode, loading, compact, onSubmit }: Props) {
   }
 
   return (
-    <div className={`no-print rounded-2xl border border-slate-200 bg-white ${compact ? 'p-2 shadow-sm' : 'p-3 shadow-[0_2px_12px_rgba(0,0,0,.08)] hover:shadow-[0_4px_20px_rgba(0,0,0,.12)]'} transition-shadow`}>
+    <div className="no-print w-full">
       {attachments.length > 0 && (
-        <div className="mb-2 flex flex-wrap gap-2 px-1">
+        <div className="mb-2 flex flex-wrap gap-2 px-2">
           {attachments.map((att) => (
-            <span key={att.id} className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-700">
+            <span key={att.id} className="inline-flex items-center gap-2 rounded-full bg-[#f1f3f4] px-3 py-1 text-xs text-[#3c4043]">
               {att.kind === 'image' ? 'Imagem' : att.kind === 'audio' ? 'Áudio' : 'Arquivo'}: {att.name}
               <button type="button" onClick={() => setAttachments((p) => p.filter((x) => x.id !== att.id))} aria-label={`Remover ${att.name}`}>
                 <X size={14} />
@@ -76,45 +77,57 @@ export function OmniInputBar({ mode, loading, compact, onSubmit }: Props) {
         </div>
       )}
 
-      <div className="flex items-center gap-2">
-        <div className="flex flex-1 items-center gap-2 rounded-xl bg-transparent px-2">
-          <SearchIcon className="shrink-0 text-slate-400" size={18} />
-          <textarea
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                void submit();
-              }
-            }}
-            rows={1}
-            placeholder="Pesquise um problema, cole texto, grave áudio ou envie arquivo..."
-            className={`max-h-32 w-full resize-none border-0 bg-transparent text-sm outline-none ${compact ? 'py-2' : 'py-3'}`}
-          />
-        </div>
-        <div className="flex items-center gap-1 pr-1">
-          <IconBtn icon={recording ? Square : Mic} active={!!recording} onClick={() => void toggleRecording()} label="Áudio" />
-          <IconBtn icon={Camera} onClick={() => imageRef.current?.click()} label="Foto" />
-          <IconBtn icon={FileUp} onClick={() => fileRef.current?.click()} label="Arquivo" />
-          <button type="button" onClick={() => void submit()} disabled={!canSend} className="ml-1 inline-flex h-9 w-9 items-center justify-center rounded-full bg-blue-600 text-white disabled:opacity-40 hover:bg-blue-700" aria-label="Pesquisar">
-            {loading ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
-          </button>
+      <div
+        className={`flex items-center gap-2 bg-white border border-[#dfe1e5] rounded-full px-4 transition-shadow ${
+          focused || !compact ? 'hover:shadow-[0_1px_6px_rgba(32,33,36,.28)] hover:border-transparent' : ''
+        } ${focused ? 'shadow-[0_1px_6px_rgba(32,33,36,.28)] border-transparent' : ''} ${compact ? 'h-11' : 'h-12 sm:h-[46px]'}`}
+      >
+        <SearchIcon className="shrink-0 text-[#9aa0a6]" size={20} />
+        <textarea
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault();
+              void submit();
+            }
+          }}
+          rows={1}
+          placeholder="Pesquise no MultiM ou digite uma URL"
+          className="flex-1 resize-none border-0 bg-transparent text-base text-[#202124] outline-none placeholder:text-[#9aa0a6] py-2 leading-6"
+        />
+        <div className="flex items-center gap-0.5 shrink-0">
+          {text && (
+            <button type="button" onClick={() => setText('')} className="p-2 text-[#70757a] hover:text-[#202124]" aria-label="Limpar">
+              <X size={20} />
+            </button>
+          )}
+          <IconBtn icon={recording ? Square : Mic} active={!!recording} onClick={() => void toggleRecording()} label="Pesquisa por voz" />
+          <IconBtn icon={Camera} onClick={() => imageRef.current?.click()} label="Pesquisa por imagem" />
+          <IconBtn icon={FileUp} onClick={() => fileRef.current?.click()} label="Anexar arquivo" />
         </div>
       </div>
 
       <input ref={imageRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => void handleFiles(e.target.files)} />
       <input ref={fileRef} type="file" accept=".pdf,.csv,.txt,.md,.json,image/*,audio/*" className="hidden" onChange={(e) => void handleFiles(e.target.files)} />
 
-      {error && <p className="mt-2 px-2 text-sm text-red-600">{error}</p>}
+      {error && <p className="mt-2 px-4 text-sm text-[#d93025]">{error}</p>}
     </div>
   );
 }
 
 function IconBtn({ icon: Icon, onClick, active, label }: { icon: React.ElementType; onClick: () => void; active?: boolean; label: string }) {
   return (
-    <button type="button" onClick={onClick} title={label} aria-label={label} className={`inline-flex h-9 w-9 items-center justify-center rounded-full transition ${active ? 'bg-red-50 text-red-600' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700'}`}>
-      <Icon size={18} />
+    <button
+      type="button"
+      onClick={onClick}
+      title={label}
+      aria-label={label}
+      className={`inline-flex h-10 w-10 items-center justify-center rounded-full transition ${active ? 'text-[#d93025] bg-red-50' : 'text-[#4285f4] hover:bg-[#f1f3f4]'}`}
+    >
+      <Icon size={20} />
     </button>
   );
 }
