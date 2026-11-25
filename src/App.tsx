@@ -55,7 +55,7 @@ export default function App() {
                 Resolva qualquer entrada em segundos.
               </h1>
               <p className="mt-1 max-w-2xl text-sm text-slate-600">
-                Digite, grave, fotografe ou anexe. A IA identifica a intenção e devolve uma saída acionável.
+                Digite, grave, fotografe, anexe ou pesquise na web. A IA identifica a intenção, pode usar busca do Google e devolve uma saída acionável com fontes.
               </p>
             </div>
             <QuickModeSelector value={mode} onChange={setMode} />

@@ -1,5 +1,6 @@
 ﻿export type QuickMode =
   | 'auto'
+  | 'search'
   | 'summarize'
   | 'diagnose'
   | 'plan'
@@ -14,12 +15,19 @@ export interface AIStep {
 export type TabularValue = string | number | boolean | null;
 export type TabularRow = Record<string, TabularValue>;
 
+export interface SourceRef {
+  title: string;
+  url: string;
+  snippet: string;
+}
+
 export interface AIResponse {
   detected_intent: string;
   direct_answer: string;
   structured_steps: AIStep[];
   tabular_data: TabularRow[];
   suggested_next_action: string;
+  sources: SourceRef[];
 }
 
 export interface MediaAttachment {

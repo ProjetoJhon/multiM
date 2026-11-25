@@ -6,6 +6,7 @@ const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 const BASE_SYSTEM_PROMPT = `
 Você é o motor de um aplicativo multimodal "canivete suíço inteligente".
 Sua tarefa: receber texto, áudio, imagem ou arquivo e entregar uma solução prática.
+Quando a pergunta exigir informação atual, fatos verificáveis, preços, notícias, locais, pessoas, empresas ou comparação com a web, USE a busca do Google disponível nas ferramentas e baseie a resposta nas fontes encontradas.
 
 REGRAS DE SAÍDA:
 - Responda SOMENTE com JSON válido, sem markdown, sem cercas de código.
@@ -15,24 +16,23 @@ REGRAS DE SAÍDA:
     "direct_answer": string (máximo 2 frases, objetiva),
     "structured_steps": [{"id": string, "label": string, "done": false}],
     "tabular_data": [objeto plano com chaves consistentes],
-    "suggested_next_action": string
+    "suggested_next_action": string,
+    "sources": [{"title": string, "url": string, "snippet": string}]
   }
 - "structured_steps": passos práticos e acionáveis. Se não houver passos, retorne [].
 - "tabular_data": dados extraíveis em formato tabular. Se não houver, retorne [].
-- Nunca invente fatos ausentes; quando incerto, diga "Não identificado" no campo apropriado.
+- "sources": fontes web usadas. Se não houver busca, retorne [].
+- Nunca invente fatos ausentes; quando incerto, diga "Não identificado" e sugira verificação.
 - Priorize clareza, utilidade imediata e segurança.
 `.trim();
 
 const MODE_PROMPTS: Record<QuickMode, string> = {
-  auto: 'Detecte automaticamente a intenção mais provável e escolha o melhor formato de solução.',
-  summarize:
-    'Modo Resumir & Extrair: extraia pontos-chave, entidades, prazos, valores e dados relevantes. Prefira tabela quando houver dados repetitivos.',
-  diagnose:
-    'Modo Diagnosticar & Resolver: identifique sintomas/causa provável e entregue passos de diagnóstico e correção em ordem segura. Alerte riscos quando houver.',
-  plan:
-    'Modo Organizar & Planejar: transforme o conteúdo em plano executável com checklist, responsáveis/prazos quando inferíveis, e tabela de acompanhamento.',
-  translate:
-    'Modo Traduzir & Explicar: traduza ou simplifique mantendo significado. Explique termos difíceis em linguagem simples e preserve dados importantes.',
+  auto: 'Detecte automaticamente a intenção. Se a pergunta precisar de dados atuais ou externos, pesquise na web antes de responder.',
+  search: 'Modo Pesquisar na Web: pesquise no Google, sintetize os achados, cite fontes em "sources" e destaque diferenças entre fontes quando houver.',
+  summarize: 'Modo Resumir & Extrair: extraia pontos-chave, entidades, prazos, valores e dados relevantes. Prefira tabela quando houver dados repetitivos.',
+  diagnose: 'Modo Diagnosticar & Resolver: identifique sintomas/causa provável e entregue passos de diagnóstico e correção em ordem segura. Alerte riscos quando houver.',
+  plan: 'Modo Organizar & Planejar: transforme o conteúdo em plano executável com checklist, responsáveis/prazos quando inferíveis, e tabela de acompanhamento.',
+  translate: 'Modo Traduzir & Explicar: traduza ou simplifique mantendo significado. Explique termos difíceis em linguagem simples e preserve dados importantes.',
 };
 
 export async function orchestrate(payload: OmniInputPayload): Promise<AIResponse> {
@@ -59,6 +59,7 @@ export async function orchestrate(payload: OmniInputPayload): Promise<AIResponse
   const body = {
     systemInstruction: { parts: [{ text: system }] },
     contents: [{ role: 'user', parts }],
+    tools: [{ google_search: {} }],
     generationConfig: {
       temperature: 0.2,
       responseMimeType: 'application/json',
@@ -74,24 +75,51 @@ export async function orchestrate(payload: OmniInputPayload): Promise<AIResponse
 
   if (!res.ok) {
     const errText = await res.text().catch(() => '');
-    throw new Error(`Erro da IA (${res.status}): ${errText.slice(0, 200)}`);
+    throw new Error(`Erro da IA (${res.status}): ${errText.slice(0, 300)}`);
   }
 
   const data = await res.json();
-  const text =
-    data?.candidates?.[0]?.content?.parts?.map((p: { text?: string }) => p.text ?? '').join('') ?? '';
-  return normalizeResponse(parseJson(text), payload);
+  const candidate = data?.candidates?.[0];
+  const text = candidate?.content?.parts?.map((p: { text?: string }) => p.text ?? '').join('') ?? '';
+  const grounding = extractGroundingSources(candidate);
+  return normalizeResponse(parseJson(text), payload, grounding);
 }
 
 function parseJson(raw: string): unknown {
   const cleaned = raw.trim().replace(/^```json\s*/i, '').replace(/```$/i, '').trim();
-  return JSON.parse(cleaned);
+  try {
+    return JSON.parse(cleaned);
+  } catch {
+    const match = cleaned.match(/\{[\s\S]*\}/);
+    if (match) return JSON.parse(match[0]);
+    throw new Error('A IA retornou um formato inesperado. Tente novamente.');
+  }
 }
 
-function normalizeResponse(raw: unknown, payload: OmniInputPayload): AIResponse {
+function extractGroundingSources(candidate: any): Array<{ title: string; url: string; snippet: string }> {
+  const meta = candidate?.groundingMetadata;
+  const chunks = Array.isArray(meta?.groundingChunks) ? meta.groundingChunks : [];
+  const sources: Array<{ title: string; url: string; snippet: string }> = [];
+  for (const ch of chunks) {
+    const web = ch?.web;
+    if (web?.uri) {
+      sources.push({ title: String(web.title || web.uri), url: String(web.uri), snippet: '' });
+    }
+  }
+  // dedupe by url
+  const seen = new Set<string>();
+  return sources.filter((s) => (seen.has(s.url) ? false : (seen.add(s.url), true))).slice(0, 8);
+}
+
+function normalizeResponse(raw: unknown, payload: OmniInputPayload, grounding: Array<{ title: string; url: string; snippet: string }>): AIResponse {
   const obj = (raw ?? {}) as Record<string, unknown>;
   const stepsRaw = Array.isArray(obj.structured_steps) ? obj.structured_steps : [];
   const tabRaw = Array.isArray(obj.tabular_data) ? obj.tabular_data : [];
+  const srcRaw = Array.isArray(obj.sources) ? obj.sources : [];
+  const sources = [...srcRaw.map(normalizeSource), ...grounding]
+    .filter((s) => s.url)
+    .filter((s, i, arr) => arr.findIndex((x) => x.url === s.url) === i)
+    .slice(0, 8);
 
   return {
     detected_intent: String(obj.detected_intent || inferIntent(payload)),
@@ -106,10 +134,14 @@ function normalizeResponse(raw: unknown, payload: OmniInputPayload): AIResponse 
       };
     }),
     tabular_data: tabRaw.filter((r) => r && typeof r === 'object') as AIResponse['tabular_data'],
-    suggested_next_action: String(
-      obj.suggested_next_action || 'Revise o resultado e me peça um ajuste específico.',
-    ),
+    suggested_next_action: String(obj.suggested_next_action || 'Revise o resultado e me peça um ajuste específico.'),
+    sources,
   };
+}
+
+function normalizeSource(s: unknown): { title: string; url: string; snippet: string } {
+  const o = (s ?? {}) as Record<string, unknown>;
+  return { title: String(o.title || o.url || 'Fonte'), url: String(o.url || ''), snippet: String(o.snippet || '') };
 }
 
 function inferIntent(payload: OmniInputPayload): string {
@@ -136,5 +168,6 @@ function mockResponse(payload: OmniInputPayload): AIResponse {
       ? [{ campo: 'Entrada', valor: payload.text.slice(0, 80) }, { campo: 'Modo', valor: payload.mode }]
       : [{ campo: 'Anexos', valor: payload.attachments.length }],
     suggested_next_action: 'Adicione mais contexto (foto, arquivo ou detalhe) para eu refinar a solução.',
+    sources: [],
   };
 }

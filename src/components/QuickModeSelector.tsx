@@ -1,8 +1,9 @@
-﻿import { FileSearch, ListChecks, Languages, Wrench, Sparkles } from 'lucide-react';
+﻿import { FileSearch, ListChecks, Languages, Wrench, Sparkles, Globe } from 'lucide-react';
 import type { QuickMode } from '../types';
 
 const modes: { id: QuickMode; label: string; icon: React.ElementType; hint: string }[] = [
   { id: 'auto', label: 'Auto', icon: Sparkles, hint: 'Detecta intenção' },
+  { id: 'search', label: 'Pesquisar Web', icon: Globe, hint: 'Busca atual com fontes' },
   { id: 'summarize', label: 'Resumir & Extrair', icon: FileSearch, hint: 'Caos em clareza' },
   { id: 'diagnose', label: 'Diagnosticar & Resolver', icon: Wrench, hint: 'Causa e correção' },
   { id: 'plan', label: 'Organizar & Planejar', icon: ListChecks, hint: 'Ações e prazos' },

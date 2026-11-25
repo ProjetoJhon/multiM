@@ -89,6 +89,23 @@ export function ActionableCard({ response }: { response: AIResponse }) {
         </section>
       )}
 
+      {response.sources?.length > 0 && (
+        <section className="mt-5">
+          <h3 className="text-sm font-semibold text-slate-700">Fontes (web)</h3>
+          <ul className="mt-2 space-y-2">
+            {response.sources.map((s, i) => (
+              <li key={`${s.url}-${i}`} className="rounded-xl border border-slate-100 px-3 py-2">
+                <a href={s.url} target="_blank" rel="noreferrer" className="text-sm font-medium text-blue-700 hover:underline">
+                  {s.title || s.url}
+                </a>
+                {s.snippet && <p className="mt-0.5 text-xs text-slate-500">{s.snippet}</p>}
+                <p className="mt-0.5 truncate text-xs text-slate-400">{s.url}</p>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
       <div className="mt-5 rounded-2xl bg-slate-900 px-4 py-3 text-sm text-slate-100">
         <span className="font-semibold text-white">Próxima ação sugerida: </span>
         {response.suggested_next_action}
