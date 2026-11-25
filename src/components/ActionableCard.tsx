@@ -12,7 +12,7 @@ export function ActionableCard({ response }: { response: AIResponse }) {
   }
 
   return (
-    <section className="space-y-1">
+    <section className="space-y-2 max-w-3xl">
       {sources.map((s, i) => {
         let host = '';
         try {
@@ -25,8 +25,8 @@ export function ActionableCard({ response }: { response: AIResponse }) {
             key={`${s.url}-${i}`}
             href={s.url}
             target="_blank"
-            rel="noreferrer"
-            className="block rounded-lg px-1 py-3 hover:bg-slate-50 transition-colors"
+            rel="noopener noreferrer"
+            className="block rounded-xl px-3 py-3 -mx-3 hover:bg-white hover:shadow-sm transition-all"
           >
             <div className="flex items-center gap-2 text-xs text-slate-500">
               <span className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-100 text-[10px] font-semibold text-slate-600">
