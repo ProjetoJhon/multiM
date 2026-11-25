@@ -67,14 +67,28 @@ export async function orchestrate(payload: OmniInputPayload): Promise<AIResponse
   };
 
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${API_KEY}`;
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
+  const res = await callGemini(url, body);
 
   if (!res.ok) {
+    // Quota/rate-limit or grounding issues: retry without web search tool for a usable answer.
+    if (res.status === 429 || res.status === 503) {
+      const { tools: _tools, ...bodyNoTools } = body as any;
+      const res2 = await callGemini(url, bodyNoTools);
+      if (res2.ok) {
+        const data2 = await res2.json();
+        const candidate2 = data2?.candidates?.[0];
+        const text2 = candidate2?.content?.parts?.map((p: { text?: string }) => p.text ?? '').join('') ?? '';
+        const normalized = normalizeResponse(parseJson(text2), payload, []);
+        return {
+          ...normalized,
+          suggested_next_action: `${normalized.suggested_next_action} (Observação: busca web indisponível no momento por limite/quota; resposta sem fontes externas.)`,
+        };
+      }
+    }
     const errText = await res.text().catch(() => '');
+    if (res.status === 429) {
+      throw new Error('Limite de quota/rate limit da API Gemini atingido (429). Aguarde alguns instantes, verifique seu plano/billing em https://ai.dev/rate-limit ou use outra chave/modelo. Detalhes: ' + errText.slice(0, 180));
+    }
     throw new Error(`Erro da IA (${res.status}): ${errText.slice(0, 300)}`);
   }
 
@@ -83,6 +97,14 @@ export async function orchestrate(payload: OmniInputPayload): Promise<AIResponse
   const text = candidate?.content?.parts?.map((p: { text?: string }) => p.text ?? '').join('') ?? '';
   const grounding = extractGroundingSources(candidate);
   return normalizeResponse(parseJson(text), payload, grounding);
+}
+
+async function callGemini(url: string, body: unknown): Promise<Response> {
+  return fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
 }
 
 function parseJson(raw: string): unknown {
