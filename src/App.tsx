@@ -1,5 +1,5 @@
 ﻿import { useMemo, useState } from 'react';
-import { AlertCircle, Clock3, Grid3X3, Trash2, X } from 'lucide-react';
+import { AlertCircle, Clock3, FlaskConical, Grid3X3, Trash2, X } from 'lucide-react';
 import { ActionableCard } from './components/ActionableCard';
 import { OmniInputBar } from './components/OmniInputBar';
 import { orchestrate } from './services/aiOrchestrator';
@@ -42,105 +42,114 @@ export default function App() {
   const hasResults = !!active || loading;
 
   return (
-    <div className={`min-h-screen bg-white text-[#202124] ${!hasResults ? 'flex flex-col' : ''}`}>
-      {/* Google-like top nav */}
-      <nav className="no-print flex items-center justify-end gap-2 px-4 py-3 text-[13px] text-[#202124]">
-        <button
-          type="button"
-          onClick={() => setDrawerOpen(true)}
-          className="hover:underline px-2 py-1"
-        >
-          Histórico
-        </button>
-        <button type="button" className="p-2 rounded-full hover:bg-[#3c404314]" aria-label="Apps">
-          <Grid3X3 size={18} className="text-[#5f6368]" />
-        </button>
-        <div className="ml-1 h-8 w-8 rounded-full bg-[#1a73e8] text-white flex items-center justify-center text-sm font-medium">M</div>
+    <div className={`min-h-screen bg-white text-[#1f1f1f] ${!hasResults ? 'flex flex-col' : ''}`}>
+      {/* Top nav - Google.com style */}
+      <nav className="no-print flex items-center justify-between px-4 sm:px-6 h-[60px] text-[14px]">
+        <div className="flex items-center gap-4">
+          <a href="#" onClick={(e) => { e.preventDefault(); clearSessions(); setError(null); }} className="text-[#1f1f1f] hover:underline">Sobre</a>
+          <span className="text-[#1f1f1f] hover:underline cursor-default hidden sm:inline">Store</span>
+        </div>
+        <div className="flex items-center gap-3">
+          <button type="button" onClick={() => setDrawerOpen(true)} className="text-[#1f1f1f] hover:underline px-1">Histórico</button>
+          <span className="text-[#1f1f1f] hover:underline cursor-default hidden sm:inline px-1">Imagens</span>
+          <button type="button" className="p-2 rounded-full hover:bg-[rgba(60,64,67,.08)]" aria-label="Google apps" title="Google apps">
+            <FlaskConical size={20} className="text-[#444746]" />
+          </button>
+          <button type="button" className="p-2 rounded-full hover:bg-[rgba(60,64,67,.08)]" aria-label="Google apps">
+            <Grid3X3 size={20} className="text-[#444746]" />
+          </button>
+          <div className="ml-1 h-8 w-8 rounded-full bg-[#0b57d0] text-white flex items-center justify-center text-sm font-medium cursor-default">M</div>
+        </div>
       </nav>
 
-      {/* Home / search header */}
       {!hasResults ? (
-        <main className="flex-1 flex flex-col items-center px-4">
-          <div className="mt-[min(18vh,140px)] w-full flex flex-col items-center">
-            <h1 className="text-[82px] sm:text-[92px] leading-none font-normal tracking-tight select-none" style={{ fontFamily: 'Arial, sans-serif' }}>
-              <span className="text-[#4285f4]">M</span>
-              <span className="text-[#ea4335]">u</span>
-              <span className="text-[#fbbc05]">l</span>
-              <span className="text-[#4285f4]">t</span>
-              <span className="text-[#34a853]">i</span>
-              <span className="text-[#ea4335]">M</span>
-            </h1>
-            <div className="w-full max-w-[584px] mt-7">
-              <OmniInputBar mode={mode} loading={loading} onSubmit={handleSubmit} />
-              <div className="mt-7 flex justify-center gap-3">
+        <>
+          <main className="flex-1 flex flex-col items-center px-5">
+            <div className="w-full flex flex-col items-center" style={{ marginTop: 'clamp(60px, 16vh, 198px)' }}>
+              {/* Google logo */}
+              <div className="mb-[26px]">
+                <h1 className="text-[92px] leading-[1] font-normal select-none" style={{ fontFamily: 'Product Sans, Arial, sans-serif', letterSpacing: '-2px' }}>
+                  <span className="text-[#4285f4]">M</span><span className="text-[#ea4335]">u</span><span className="text-[#fbbc05]">l</span><span className="text-[#4285f4]">t</span><span className="text-[#34a853]">i</span><span className="text-[#ea4335]">M</span>
+                </h1>
+              </div>
+
+              {/* Search bar */}
+              <div className="w-full max-w-[584px]">
+                <OmniInputBar mode={mode} loading={loading} onSubmit={handleSubmit} />
+              </div>
+
+              {/* Buttons */}
+              <div className="mt-[29px] flex gap-3">
                 <button
                   type="button"
-                  onClick={() => {
-                    const ta = document.querySelector('textarea');
-                    if (ta) (ta as HTMLTextAreaElement).form?.requestSubmit?.();
-                  }}
-                  className="h-9 px-4 rounded bg-[#f8f9fa] border border-[#f8f9fa] text-sm text-[#3c4043] hover:shadow hover:border-[#dadce0]"
+                  onClick={() => { const el = document.querySelector('textarea') as HTMLTextAreaElement | null; el?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); }}
+                  className="bg-[#f8f9fa] border border-[#f8f9fa] rounded-[4px] text-[#3c4043] text-[14px] h-[36px] px-[16px] hover:border-[#dadce0] hover:shadow-[0_1px_1px_rgba(0,0,0,.1)]"
                 >
-                  Pesquisa MultiM
+                  Pesquisa Google
                 </button>
                 <button
                   type="button"
                   onClick={() => setDrawerOpen(true)}
-                  className="h-9 px-4 rounded bg-[#f8f9fa] border border-[#f8f9fa] text-sm text-[#3c4043] hover:shadow hover:border-[#dadce0]"
+                  className="bg-[#f8f9fa] border border-[#f8f9fa] rounded-[4px] text-[#3c4043] text-[14px] h-[36px] px-[16px] hover:border-[#dadce0] hover:shadow-[0_1px_1px_rgba(0,0,0,.1)]"
                 >
-                  Pesquisas recentes
+                  Estou com sorte
                 </button>
               </div>
             </div>
-          </div>
-          <div className="flex-1" />
-          <footer className="w-full bg-[#f2f2f2] text-[#70757a] text-sm mt-auto">
-            <div className="px-7 py-3 border-b border-[#dadce0]">Brasil</div>
-            <div className="flex flex-col sm:flex-row justify-between px-7 py-3 gap-2">
-              <div className="flex gap-6 justify-center sm:justify-start flex-wrap">
-                <span className="hover:underline cursor-default">Sobre</span>
-                <span className="hover:underline cursor-default">Publicidade</span>
-                <span className="hover:underline cursor-default">Negócios</span>
+          </main>
+
+          {/* Footer - Google style */}
+          <footer className="bg-[#f2f2f2] text-[#1f1f1f] text-[14px]">
+            <div className="px-[30px] py-[15px] border-b border-[#dadce0] text-[#1f1f1f]">Brasil</div>
+            <div className="flex flex-col sm:flex-row justify-between px-[20px] py-0">
+              <div className="flex justify-center sm:justify-start flex-wrap">
+                {['Sobre', 'Publicidade', 'Negócios', 'Como funciona a Pesquisa'].map((t) => (
+                  <span key={t} className="px-[15px] py-[14px] hover:underline cursor-default text-[#1f1f1f]">{t}</span>
+                ))}
               </div>
-              <div className="flex gap-6 justify-center sm:justify-end flex-wrap">
-                <span className="hover:underline cursor-default">Privacidade</span>
-                <span className="hover:underline cursor-default">Termos</span>
-                <span className="hover:underline cursor-default">Configurações</span>
+              <div className="flex justify-center sm:justify-end flex-wrap">
+                {['Privacidade', 'Termos', 'Configurações'].map((t) => (
+                  <span key={t} className="px-[15px] py-[14px] hover:underline cursor-default text-[#1f1f1f]">{t}</span>
+                ))}
               </div>
             </div>
           </footer>
-        </main>
+        </>
       ) : (
         <>
           <header className="no-print sticky top-0 z-30 bg-white border-b border-[#ebebeb]">
-            <div className="flex items-center gap-4 px-4 py-3 sm:px-6">
+            <div className="flex items-center gap-10 px-6 pt-5 pb-3">
               <button
                 type="button"
                 onClick={() => { clearSessions(); setError(null); }}
-                className="shrink-0 text-[28px] leading-none font-normal tracking-tight select-none"
-                style={{ fontFamily: 'Arial, sans-serif' }}
-                title="Voltar ao início"
+                className="shrink-0 text-[30px] leading-none font-normal select-none"
+                style={{ fontFamily: 'Product Sans, Arial, sans-serif', letterSpacing: '-1px' }}
+                title="Ir para a página inicial do MultiM"
               >
                 <span className="text-[#4285f4]">M</span><span className="text-[#ea4335]">u</span><span className="text-[#fbbc05]">l</span><span className="text-[#4285f4]">t</span><span className="text-[#34a853]">i</span><span className="text-[#ea4335]">M</span>
               </button>
-              <div className="flex-1 max-w-[692px]">
+              <div className="flex-1 max-w-[690px]">
                 <OmniInputBar mode={mode} loading={loading} onSubmit={handleSubmit} compact />
               </div>
             </div>
+            <div className="flex items-center gap-6 px-6 lg:pl-[180px] text-[14px] text-[#5f6368]">
+              <span className="py-3 border-b-[3px] border-[#1a73e8] text-[#1a73e8] -mb-px">Todos</span>
+              <span className="py-3 cursor-default hover:text-[#202124]">Imagens</span>
+              <span className="py-3 cursor-default hover:text-[#202124]">Vídeos</span>
+              <span className="py-3 cursor-default hover:text-[#202124]">Notícias</span>
+            </div>
           </header>
 
-          <main className="px-4 sm:px-6 lg:pl-[180px] py-4 max-w-[1120px]">
+          <main className="px-6 lg:pl-[180px] py-3 max-w-[1176px]">
             {error && (
-              <div className="no-print mb-4 flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              <div className="no-print mb-4 flex items-center gap-2 rounded border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
                 <AlertCircle size={16} /> {error}
               </div>
             )}
-
             {loading && <LoadingResults />}
-
             {!loading && active && (
               <div>
-                <p className="text-sm text-[#70757a] mb-4">
+                <p className="text-[14px] text-[#70757a] leading-[43px]">
                   Aproximadamente {active.response.sources?.length || 0} resultados
                 </p>
                 <ActionableCard response={active.response} />
@@ -154,30 +163,30 @@ export default function App() {
       {drawerOpen && (
         <div className="no-print fixed inset-0 z-50">
           <div className="absolute inset-0 bg-black/20" onClick={() => setDrawerOpen(false)} />
-          <aside className="absolute right-0 top-0 h-full w-[320px] max-w-[85vw] bg-white shadow-2xl flex flex-col">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
-              <h2 className="flex items-center gap-2 text-sm font-medium text-[#202124]"><Clock3 size={16} /> Pesquisas recentes</h2>
+          <aside className="absolute right-0 top-0 h-full w-[360px] max-w-[90vw] bg-white shadow-2xl flex flex-col rounded-l-2xl">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-[#dadce0]">
+              <h2 className="flex items-center gap-2 text-[16px] text-[#202124]"><Clock3 size={18} /> Pesquisas recentes</h2>
               <div className="flex items-center gap-1">
                 {sessions.length > 0 && (
-                  <button onClick={() => { clearSessions(); }} className="p-2 text-[#5f6368] hover:bg-slate-100 rounded-full" aria-label="Limpar" title="Limpar">
-                    <Trash2 size={16} />
+                  <button onClick={() => { clearSessions(); }} className="p-2 text-[#5f6368] hover:bg-[#f1f3f4] rounded-full" aria-label="Limpar">
+                    <Trash2 size={18} />
                   </button>
                 )}
-                <button onClick={() => setDrawerOpen(false)} className="p-2 text-[#5f6368] hover:bg-slate-100 rounded-full" aria-label="Fechar">
+                <button onClick={() => setDrawerOpen(false)} className="p-2 text-[#5f6368] hover:bg-[#f1f3f4] rounded-full" aria-label="Fechar">
                   <X size={18} />
                 </button>
               </div>
             </div>
             <div className="flex-1 overflow-y-auto p-2">
-              {sessions.length === 0 && <p className="px-3 py-6 text-sm text-[#70757a] text-center">Nenhuma pesquisa recente.</p>}
+              {sessions.length === 0 && <p className="px-4 py-8 text-sm text-[#70757a] text-center">Nenhuma pesquisa recente.</p>}
               {sessions.map((s) => (
                 <button
                   key={s.id}
                   onClick={() => { setActiveSession(s.id); setDrawerOpen(false); }}
-                  className={`w-full rounded-lg px-3 py-3 text-left transition ${activeSessionId === s.id ? 'bg-[#e8f0fe]' : 'hover:bg-[#f1f3f4]'}`}
+                  className={`w-full rounded-lg px-4 py-3 text-left transition ${activeSessionId === s.id ? 'bg-[#e8f0fe]' : 'hover:bg-[#f1f3f4]'}`}
                 >
-                  <div className="text-[11px] text-[#70757a]">{new Date(s.createdAt).toLocaleString('pt-BR')}</div>
-                  <div className="mt-0.5 line-clamp-2 text-sm text-[#202124]">{s.inputSummary || 'Pesquisa'}</div>
+                  <div className="text-[12px] text-[#70757a]">{new Date(s.createdAt).toLocaleString('pt-BR')}</div>
+                  <div className="mt-0.5 truncate text-[14px] text-[#202124]">{s.inputSummary || 'Pesquisa'}</div>
                 </button>
               ))}
             </div>
@@ -190,16 +199,19 @@ export default function App() {
 
 function LoadingResults() {
   return (
-    <div className="space-y-7 max-w-[600px]">
+    <div className="space-y-8 max-w-[600px] mt-2">
       {[1, 2, 3, 4].map((i) => (
-        <div key={i} className="space-y-2">
-          <div className="flex items-center gap-3">
-            <div className="h-[26px] w-[26px] animate-pulse rounded-full bg-[#e8eaed]" />
-            <div className="h-3 w-32 animate-pulse rounded bg-[#e8eaed]" />
+        <div key={i}>
+          <div className="flex items-center gap-3 mb-2">
+            <div className="h-[28px] w-[28px] animate-pulse rounded-full bg-[#e8eaed]" />
+            <div className="space-y-1">
+              <div className="h-3 w-24 animate-pulse rounded bg-[#e8eaed]" />
+              <div className="h-2.5 w-40 animate-pulse rounded bg-[#f1f3f4]" />
+            </div>
           </div>
-          <div className="h-5 w-4/5 animate-pulse rounded bg-[#e8eaed]" />
-          <div className="h-4 w-full animate-pulse rounded bg-[#f1f3f4]" />
-          <div className="h-4 w-2/3 animate-pulse rounded bg-[#f1f3f4]" />
+          <div className="h-5 w-[75%] animate-pulse rounded bg-[#e8eaed] mb-2" />
+          <div className="h-4 w-full animate-pulse rounded bg-[#f1f3f4] mb-1" />
+          <div className="h-4 w-[85%] animate-pulse rounded bg-[#f1f3f4]" />
         </div>
       ))}
     </div>
