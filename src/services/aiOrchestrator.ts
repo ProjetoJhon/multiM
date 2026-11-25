@@ -35,6 +35,8 @@ const MODE_PROMPTS: Record<QuickMode, string> = {
   translate: 'Modo Traduzir & Explicar: traduza ou simplifique mantendo significado. Explique termos difíceis em linguagem simples e preserve dados importantes.',
 };
 
+const FALLBACK_MODELS = ['gemini-flash-lite-latest', 'gemini-3-flash-preview', 'gemini-flash-latest'];
+
 export async function orchestrate(payload: OmniInputPayload): Promise<AIResponse> {
   if (!API_KEY) return mockResponse(payload);
 
@@ -56,46 +58,59 @@ export async function orchestrate(payload: OmniInputPayload): Promise<AIResponse
     parts.push({ inlineData: { mimeType: att.mimeType, data: att.base64 } });
   }
 
-  const body = {
+  const bodyWithTools = {
     systemInstruction: { parts: [{ text: system }] },
     contents: [{ role: 'user', parts }],
     tools: [{ google_search: {} }],
-    generationConfig: {
-      temperature: 0.2,
-      responseMimeType: 'application/json',
-    },
+    generationConfig: { temperature: 0.2, responseMimeType: 'application/json' },
   };
+  const { tools: _t, ...bodyNoTools } = bodyWithTools as any;
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${API_KEY}`;
-  const res = await callGemini(url, body);
+  const models = [MODEL, ...FALLBACK_MODELS].filter((m, i, a) => a.indexOf(m) === i);
+  let lastErr = '';
+  let lastStatus = 0;
 
-  if (!res.ok) {
-    // Quota/rate-limit or grounding issues: retry without web search tool for a usable answer.
+  for (const model of models) {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${API_KEY}`;
+
+    // 1) Try with web grounding
+    let res = await callGemini(url, bodyWithTools);
+    if (res.ok) {
+      return await parseCandidate(res, payload, true, model);
+    }
+    lastStatus = res.status;
+    lastErr = await res.text().catch(() => '');
+
+    // 2) On quota/unavailable, retry same model without grounding
     if (res.status === 429 || res.status === 503) {
-      const { tools: _tools, ...bodyNoTools } = body as any;
-      const res2 = await callGemini(url, bodyNoTools);
-      if (res2.ok) {
-        const data2 = await res2.json();
-        const candidate2 = data2?.candidates?.[0];
-        const text2 = candidate2?.content?.parts?.map((p: { text?: string }) => p.text ?? '').join('') ?? '';
-        const normalized = normalizeResponse(parseJson(text2), payload, []);
-        return {
-          ...normalized,
-          suggested_next_action: `${normalized.suggested_next_action} (Observação: busca web indisponível no momento por limite/quota; resposta sem fontes externas.)`,
-        };
+      res = await callGemini(url, bodyNoTools);
+      if (res.ok) {
+        const normalized = await parseCandidate(res, payload, false, model);
+        const note = model !== MODEL
+          ? ` (Observação: resposta com modelo fallback ${model}, sem busca web por limite/quota.)`
+          : ' (Observação: busca web indisponível no momento por limite/quota; resposta sem fontes externas.)';
+        return { ...normalized, suggested_next_action: `${normalized.suggested_next_action}${note}` };
       }
+      lastStatus = res.status;
+      lastErr = await res.text().catch(() => '');
     }
-    const errText = await res.text().catch(() => '');
-    if (res.status === 429) {
-      throw new Error('Limite de quota/rate limit da API Gemini atingido (429). Aguarde alguns instantes, verifique seu plano/billing em https://ai.dev/rate-limit ou use outra chave/modelo. Detalhes: ' + errText.slice(0, 180));
+
+    // Non-retryable errors: throw immediately
+    if (![429, 503, 404].includes(lastStatus)) {
+      throw new Error(`Erro da IA (${lastStatus}): ${lastErr.slice(0, 300)}`);
     }
-    throw new Error(`Erro da IA (${res.status}): ${errText.slice(0, 300)}`);
   }
 
+  throw new Error(
+    `Limite de quota/rate limit da API Gemini atingido (${lastStatus}). Aguarde alguns instantes, verifique plano/billing em https://ai.dev/rate-limit ou use outra chave/modelo. Detalhes: ${lastErr.slice(0, 180)}`,
+  );
+}
+
+async function parseCandidate(res: Response, payload: OmniInputPayload, withGrounding: boolean, _model: string): Promise<AIResponse> {
   const data = await res.json();
   const candidate = data?.candidates?.[0];
   const text = candidate?.content?.parts?.map((p: { text?: string }) => p.text ?? '').join('') ?? '';
-  const grounding = extractGroundingSources(candidate);
+  const grounding = withGrounding ? extractGroundingSources(candidate) : [];
   return normalizeResponse(parseJson(text), payload, grounding);
 }
 
