@@ -1,4 +1,5 @@
 ﻿import type { AIResponse, OmniInputPayload, QuickMode } from '../types';
+import { searchWeb } from './searchProvider';
 
 const MODEL = import.meta.env.VITE_AI_MODEL || 'gemini-flash-lite-latest';
 const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
@@ -40,14 +41,24 @@ const FALLBACK_MODELS = ['gemini-flash-lite-latest', 'gemini-3-flash-preview', '
 export async function orchestrate(payload: OmniInputPayload): Promise<AIResponse> {
   if (!API_KEY) return mockResponse(payload);
 
+  // Fetch web search results for search mode or auto with text query
+  const shouldWebSearch = payload.mode === 'search' || (payload.mode === 'auto' && !!payload.text?.trim() && payload.attachments.length === 0);
+  const webResultsPromise = shouldWebSearch ? searchWeb(payload.text || '') : Promise.resolve([]);
+
   const system = `${BASE_SYSTEM_PROMPT}\n\nMODO ATIVO: ${MODE_PROMPTS[payload.mode]}`;
   const parts: Array<Record<string, unknown>> = [];
+
+  const webResults = await webResultsPromise.catch(() => []);
+  const webContext = webResults.length > 0
+    ? `\n\nRESULTADOS DA WEB (use-os para responder e inclua os mais relevantes em "sources"):\n${webResults.map((r, i) => `${i + 1}. ${r.title}\n   URL: ${r.url}\n   Snippet: ${r.snippet}`).join('\n')}`
+    : '';
 
   const userText = [
     payload.text?.trim() ? `Entrada do usuário:\n${payload.text.trim()}` : '',
     payload.attachments.length
       ? `Anexos enviados: ${payload.attachments.map((a) => `${a.kind}:${a.name}`).join(', ')}`
       : '',
+    webContext,
   ]
     .filter(Boolean)
     .join('\n\n');
@@ -58,10 +69,12 @@ export async function orchestrate(payload: OmniInputPayload): Promise<AIResponse
     parts.push({ inlineData: { mimeType: att.mimeType, data: att.base64 } });
   }
 
+  // Only use Gemini google_search tool when we don't have our own web results
+  const useGoogleTool = webResults.length === 0;
   const bodyWithTools = {
     systemInstruction: { parts: [{ text: system }] },
     contents: [{ role: 'user', parts }],
-    tools: [{ google_search: {} }],
+    ...(useGoogleTool ? { tools: [{ google_search: {} }] } : {}),
     generationConfig: { temperature: 0.2, responseMimeType: 'application/json' },
   };
   const { tools: _t, ...bodyNoTools } = bodyWithTools as any;
@@ -76,7 +89,8 @@ export async function orchestrate(payload: OmniInputPayload): Promise<AIResponse
     // 1) Try with web grounding
     let res = await callGemini(url, bodyWithTools);
     if (res.ok) {
-      return await parseCandidate(res, payload, true, model);
+      const result = await parseCandidate(res, payload, useGoogleTool, model);
+      return mergeWebResults(result, webResults);
     }
     lastStatus = res.status;
     lastErr = await res.text().catch(() => '');
@@ -86,10 +100,13 @@ export async function orchestrate(payload: OmniInputPayload): Promise<AIResponse
       res = await callGemini(url, bodyNoTools);
       if (res.ok) {
         const normalized = await parseCandidate(res, payload, false, model);
-        const note = model !== MODEL
-          ? ` (Observação: resposta com modelo fallback ${model}, sem busca web por limite/quota.)`
-          : ' (Observação: busca web indisponível no momento por limite/quota; resposta sem fontes externas.)';
-        return { ...normalized, suggested_next_action: `${normalized.suggested_next_action}${note}` };
+        const merged = mergeWebResults(normalized, webResults);
+        const note = webResults.length > 0
+          ? ''
+          : (model !== MODEL
+            ? ` (Observação: resposta com modelo fallback ${model}, sem busca web por limite/quota.)`
+            : ' (Observação: busca web indisponível no momento por limite/quota; resposta sem fontes externas.)');
+        return note ? { ...merged, suggested_next_action: `${merged.suggested_next_action}${note}` } : merged;
       }
       lastStatus = res.status;
       lastErr = await res.text().catch(() => '');
@@ -148,6 +165,13 @@ function extractGroundingSources(candidate: any): Array<{ title: string; url: st
   return sources.filter((s) => (seen.has(s.url) ? false : (seen.add(s.url), true))).slice(0, 8);
 }
 
+
+function mergeWebResults(result: AIResponse, webResults: Array<{title:string;url:string;snippet:string}>): AIResponse {
+  if (!webResults.length) return result;
+  const seen = new Set(result.sources.map((s) => s.url));
+  const extra = webResults.filter((s) => s.url && !seen.has(s.url)).map((s) => ({ title: s.title, url: s.url, snippet: s.snippet }));
+  return { ...result, sources: [...result.sources, ...extra].slice(0, 12) };
+}
 function normalizeResponse(raw: unknown, payload: OmniInputPayload, grounding: Array<{ title: string; url: string; snippet: string }>): AIResponse {
   const obj = (raw ?? {}) as Record<string, unknown>;
   const stepsRaw = Array.isArray(obj.structured_steps) ? obj.structured_steps : [];
@@ -208,3 +232,4 @@ function mockResponse(payload: OmniInputPayload): AIResponse {
     sources: [],
   };
 }
+
