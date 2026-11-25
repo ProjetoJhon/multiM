@@ -1,7 +1,7 @@
 ﻿import { aiResponseJsonSchema } from '../schemas/responseSchema';
 import type { AIResponse, OmniInputPayload, QuickMode } from '../types';
 
-const MODEL = import.meta.env.VITE_AI_MODEL || 'gemini-2.5-flash';
+const MODEL = import.meta.env.VITE_AI_MODEL || 'gemini-flash-lite-latest';
 const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 
 const BASE_SYSTEM_PROMPT = `

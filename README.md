@@ -29,5 +29,6 @@ npm run dev
 
 ## VariÃ¡veis de ambiente
 - `VITE_GEMINI_API_KEY` â€” chave da API Gemini (opcional no MVP; sem ela usa mock)
-- `VITE_AI_MODEL` â€” modelo, padrÃ£o `gemini-2.5-flash`
+- `VITE_AI_MODEL` â€” modelo, padrÃ£o `gemini-flash-lite-latest`
+
 
